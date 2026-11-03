@@ -21,6 +21,10 @@ venv/
 ENV/
 env/
 
+# Local Database & Mock Data
+backend/data/
+*.json.bak
+
 # IDE & Editor files
 .vscode/
 .idea/
@@ -35,3 +39,4 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
