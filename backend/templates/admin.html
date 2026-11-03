@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ParkAssist | Admin Console & Data Purge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#0f172a',
+            danger: '#dc2626',
+            primary: '#2563eb'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans antialiased flex flex-col justify-between">
+
+  <!-- Navbar -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <span class="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center font-black text-lg shadow-md">
+          ⚙️
+        </span>
+        <div>
+          <h1 class="text-base font-black text-white tracking-tight">ParkAssist Admin Console</h1>
+          <p class="text-[11px] text-slate-400">Database Purge & Content Moderation</p>
+        </div>
+      </div>
+      <div id="authStatusArea" class="flex items-center space-x-3">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-6xl w-full mx-auto px-4 py-6 flex-1">
+
+    <!-- 1. Admin Sign In Card (If not authenticated) -->
+    <div id="loginCard" class="max-w-md mx-auto bg-white rounded-2xl shadow-md border border-slate-200 p-8 my-10 space-y-5">
+      <div class="text-center space-y-1">
+        <div class="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold">
+          🔒
+        </div>
+        <h2 class="text-xl font-extrabold text-slate-900">Administrator Access</h2>
+        <p class="text-xs text-slate-500">Enter admin credentials configured in backend/.env</p>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Admin Email</label>
+          <input type="email" id="adminEmail" placeholder="admin@parkassist.local" value="admin@parkassist.local" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Admin Password</label>
+          <input type="password" id="adminPassword" placeholder="••••••••" value="ChangeMe123!" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white" />
+        </div>
+        <button onclick="handleAdminLogin()" id="loginBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-extrabold py-3 rounded-xl transition shadow-md flex items-center justify-center space-x-2">
+          <span>Authorize Access</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. Admin Dashboard (Protected Area) -->
+    <div id="dashboardSection" class="hidden space-y-6">
+
+      <!-- Platform Stats Bar -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <p class="text-xs font-bold text-slate-400 uppercase">Total Users</p>
+          <p id="statUsers" class="text-3xl font-extrabold text-slate-900 mt-1">0</p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <p class="text-xs font-bold text-slate-400 uppercase">Vehicles Registered</p>
+          <p id="statVehicles" class="text-3xl font-extrabold text-blue-600 mt-1">0</p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <p class="text-xs font-bold text-slate-400 uppercase">Active Reports</p>
+          <p id="statActiveIncidents" class="text-3xl font-extrabold text-amber-500 mt-1">0</p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <p class="text-xs font-bold text-slate-400 uppercase">Resolved Reports</p>
+          <p id="statResolvedIncidents" class="text-3xl font-extrabold text-emerald-600 mt-1">0</p>
+        </div>
+      </div>
+
+      <!-- Action Tabs -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="flex border-b border-slate-200 bg-slate-50 text-xs font-bold">
+          <button onclick="switchTab('vehicles')" id="tabVehiclesBtn" class="flex-1 py-3.5 px-4 border-b-2 border-red-600 bg-white text-red-600 flex items-center justify-center space-x-2">
+            <span>🚗</span> <span>Vehicles Management</span>
+          </button>
+          <button onclick="switchTab('incidents')" id="tabIncidentsBtn" class="flex-1 py-3.5 px-4 text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-2">
+            <span>⚠️</span> <span>Incident Reports</span>
+          </button>
+          <button onclick="switchTab('users')" id="tabUsersBtn" class="flex-1 py-3.5 px-4 text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-2">
+            <span>👥</span> <span>Users Management</span>
+          </button>
+        </div>
+
+        <!-- Section: Vehicles -->
+        <div id="sectionVehicles" class="p-5 space-y-4">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Registered Vehicles</h3>
+              <p class="text-xs text-slate-400">Delete obsolete, test, or violating vehicle records</p>
+            </div>
+            <button onclick="loadVehicles()" class="text-xs font-bold text-blue-600 hover:underline">
+              🔄 Refresh
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-y border-slate-200">
+                <tr>
+                  <th class="py-3 px-3">Plate / Details</th>
+                  <th class="py-3 px-3">Owner</th>
+                  <th class="py-3 px-3">Token</th>
+                  <th class="py-3 px-3">Incidents</th>
+                  <th class="py-3 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="vehiclesTableBody" class="divide-y divide-slate-100">
+                <tr><td colspan="5" class="py-6 text-center text-slate-400">Loading vehicles...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section: Incidents -->
+        <div id="sectionIncidents" class="p-5 space-y-4 hidden">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Incident Reports Moderation</h3>
+              <p class="text-xs text-slate-400">Purge spam, offensive, or solved incident reports</p>
+            </div>
+            <button onclick="loadIncidents()" class="text-xs font-bold text-blue-600 hover:underline">
+              🔄 Refresh
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-y border-slate-200">
+                <tr>
+                  <th class="py-3 px-3">Vehicle Plate</th>
+                  <th class="py-3 px-3">Type</th>
+                  <th class="py-3 px-3">Description</th>
+                  <th class="py-3 px-3">Location / GPS</th>
+                  <th class="py-3 px-3">Status</th>
+                  <th class="py-3 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="incidentsTableBody" class="divide-y divide-slate-100">
+                <tr><td colspan="6" class="py-6 text-center text-slate-400">Loading reports...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section: Users -->
+        <div id="sectionUsers" class="p-5 space-y-4 hidden">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Registered Users</h3>
+              <p class="text-xs text-slate-400">Deleting a user cascades and permanently removes all their vehicles and reports</p>
+            </div>
+            <button onclick="loadUsers()" class="text-xs font-bold text-blue-600 hover:underline">
+              🔄 Refresh
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-y border-slate-200">
+                <tr>
+                  <th class="py-3 px-3">Name</th>
+                  <th class="py-3 px-3">Email</th>
+                  <th class="py-3 px-3">Phone</th>
+                  <th class="py-3 px-3">Role</th>
+                  <th class="py-3 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody" class="divide-y divide-slate-100">
+                <tr><td colspan="5" class="py-6 text-center text-slate-400">Loading users...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400">
+    ParkAssist Admin Infrastructure • Access strictly restricted to authorized staff
+  </footer>
+
+  <script>
+    let adminToken = localStorage.getItem('parkassist_admin_token') || '';
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (adminToken) {
+        testAndLoadDashboard();
+      } else {
+        renderLoginView();
+      }
+    });
+
+    async function handleAdminLogin() {
+      const email = document.getElementById('adminEmail').value.trim();
+      const password = document.getElementById('adminPassword').value.trim();
+
+      if (!email || !password) {
+        alert("Enter admin email and password.");
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const contentType = res.headers.get("content-type") || "";
+        let data;
+        if (contentType.includes("application/json")) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          throw new Error("Server returned HTML error (HTTP " + res.status + "). Please check terminal logs.");
+        }
+
+        if (!res.ok) {
+          alert(data.error || "Login failed");
+          return;
+        }
+
+        if (data.user.role !== 'admin') {
+          alert("Unauthorized: This account does not possess administrator credentials.");
+          return;
+        }
+
+        adminToken = data.token;
+        localStorage.setItem('parkassist_admin_token', adminToken);
+        testAndLoadDashboard();
+      } catch (e) {
+        alert("Connection error: " + e.message);
+      }
+    }
+
+    function handleAdminLogout() {
+      adminToken = '';
+      localStorage.removeItem('parkassist_admin_token');
+      renderLoginView();
+    }
+
+    function renderLoginView() {
+      document.getElementById('loginCard').classList.remove('hidden');
+      document.getElementById('dashboardSection').classList.add('hidden');
+      document.getElementById('authStatusArea').innerHTML = `
+        <span class="text-xs text-slate-400 font-semibold">Not Authorized</span>
+      `;
+    }
+
+    async function testAndLoadDashboard() {
+      try {
+        const res = await fetch('/api/admin/stats', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (!res.ok) {
+          handleAdminLogout();
+          return;
+        }
+        const stats = await res.json();
+        document.getElementById('loginCard').classList.add('hidden');
+        document.getElementById('dashboardSection').classList.remove('hidden');
+
+        document.getElementById('authStatusArea').innerHTML = `
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+            🛡️ Admin Logged In
+          </span>
+          <button onclick="handleAdminLogout()" class="text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg transition">
+            Exit
+          </button>
+        `;
+
+        document.getElementById('statUsers').innerText = stats.total_users || 0;
+        document.getElementById('statVehicles').innerText = stats.total_vehicles || 0;
+        document.getElementById('statActiveIncidents').innerText = stats.open_incidents || 0;
+        document.getElementById('statResolvedIncidents').innerText = stats.resolved_incidents || 0;
+
+        loadVehicles();
+      } catch (e) {
+        handleAdminLogout();
+      }
+    }
+
+    function switchTab(tab) {
+      const vSec = document.getElementById('sectionVehicles');
+      const iSec = document.getElementById('sectionIncidents');
+      const uSec = document.getElementById('sectionUsers');
+
+      const vBtn = document.getElementById('tabVehiclesBtn');
+      const iBtn = document.getElementById('tabIncidentsBtn');
+      const uBtn = document.getElementById('tabUsersBtn');
+
+      [vSec, iSec, uSec].forEach(s => s.classList.add('hidden'));
+      [vBtn, iBtn, uBtn].forEach(b => {
+        b.className = "flex-1 py-3.5 px-4 text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-2";
+      });
+
+      if (tab === 'vehicles') {
+        vSec.classList.remove('hidden');
+        vBtn.className = "flex-1 py-3.5 px-4 border-b-2 border-red-600 bg-white text-red-600 font-bold flex items-center justify-center space-x-2";
+        loadVehicles();
+      } else if (tab === 'incidents') {
+        iSec.classList.remove('hidden');
+        iBtn.className = "flex-1 py-3.5 px-4 border-b-2 border-red-600 bg-white text-red-600 font-bold flex items-center justify-center space-x-2";
+        loadIncidents();
+      } else if (tab === 'users') {
+        uSec.classList.remove('hidden');
+        uBtn.className = "flex-1 py-3.5 px-4 border-b-2 border-red-600 bg-white text-red-600 font-bold flex items-center justify-center space-x-2";
+        loadUsers();
+      }
+    }
+
+    async function loadVehicles() {
+      const tbody = document.getElementById('vehiclesTableBody');
+      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Loading vehicles...</td></tr>`;
+
+      const res = await fetch('/api/admin/vehicles', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.vehicles.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No vehicle records found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.vehicles.map(v => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-3">
+            <p class="font-extrabold text-slate-900">${v.registration_number}</p>
+            <p class="text-[11px] text-slate-400">${v.make} ${v.model} (${v.year || '2024'}) • ${v.color || 'Standard'}</p>
+          </td>
+          <td class="py-3 px-3 font-medium text-slate-600">${v.owner_email || '—'}</td>
+          <td class="py-3 px-3 font-mono font-bold text-blue-600 text-[11px]">${v.token}</td>
+          <td class="py-3 px-3 font-bold text-slate-700">${v.incident_count || 0}</td>
+          <td class="py-3 px-3 text-right">
+            <button onclick="deleteVehicle('${v.id}', '${v.registration_number}')" class="px-2.5 py-1 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg text-xs font-bold transition border border-red-200">
+              🗑️ Delete
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function deleteVehicle(id, plate) {
+      if (!confirm(`Are you sure you want to permanently delete vehicle "${plate}" and all its reported incidents?`)) return;
+      const res = await fetch(`/api/admin/vehicles/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+      testAndLoadDashboard();
+    }
+
+    async function loadIncidents() {
+      const tbody = document.getElementById('incidentsTableBody');
+      tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">Loading reports...</td></tr>`;
+
+      const res = await fetch('/api/admin/incidents', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.incidents.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">No incident reports found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.incidents.map(inc => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-3 font-extrabold text-slate-900">${inc.reg_number}</td>
+          <td class="py-3 px-3 font-bold text-blue-700">${inc.type}</td>
+          <td class="py-3 px-3 text-slate-600 max-w-xs truncate" title="${inc.description}">${inc.description}</td>
+          <td class="py-3 px-3 text-slate-500">
+            ${inc.location || 'Nearby'}
+            ${inc.coordinates ? `<span class="block text-[10px] text-emerald-600 font-bold">📍 Lat: ${inc.coordinates.latitude}</span>` : ''}
+          </td>
+          <td class="py-3 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${inc.status === 'Open' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}">
+              ${inc.status}
+            </span>
+          </td>
+          <td class="py-3 px-3 text-right">
+            <button onclick="deleteIncident('${inc.id}')" class="px-2.5 py-1 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg text-xs font-bold transition border border-red-200">
+              🗑️ Delete
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function deleteIncident(id) {
+      if (!confirm("Permanently delete this incident report?")) return;
+      const res = await fetch(`/api/admin/incidents/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+      loadIncidents();
+    }
+
+    async function loadUsers() {
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Loading users...</td></tr>`;
+
+      const res = await fetch('/api/admin/users', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.users.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No user records found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.users.map(u => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-3 font-extrabold text-slate-900">${u.name}</td>
+          <td class="py-3 px-3 text-slate-600">${u.email}</td>
+          <td class="py-3 px-3 text-slate-500">${u.phone || '—'}</td>
+          <td class="py-3 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}">
+              ${u.role}
+            </span>
+          </td>
+          <td class="py-3 px-3 text-right">
+            ${u.role === 'admin' ? '<span class="text-slate-400 text-[11px]">Protected</span>' : `
+              <button onclick="deleteUser('${u.id}', '${u.email}')" class="px-2.5 py-1 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-lg text-xs font-bold transition border border-red-200">
+                🗑️ Delete User
+              </button>
+            `}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function deleteUser(id, email) {
+      if (!confirm(`Warning: Deleting user "${email}" will also permanently delete ALL their registered vehicles and incident reports. Proceed?`)) return;
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+      testAndLoadDashboard();
+      loadUsers();
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,30 @@
+[
+  {
+    "owner_id": "6ae8ca636fc2b2290f01d2e2",
+    "registration_number": "KA01AB9999",
+    "make": "Honda",
+    "model": "Elevate",
+    "year": "2024",
+    "color": "Red",
+    "type": "SUV",
+    "token": "PA-KA01AB-F1E4C6",
+    "qr_active": true,
+    "created_at": "2026-11-02T17:37:39.162000",
+    "updated_at": "2026-11-02T17:37:39.162000",
+    "_id": "6ae8ca636fc2b2290f01d2e3"
+  },
+  {
+    "owner_id": "6ae9eb76cb1f236bdc2e5cb9",
+    "registration_number": "DL 01 AB 1234",
+    "make": "Honda",
+    "model": "City",
+    "year": "2024",
+    "color": "Red",
+    "type": "Car",
+    "token": "PA-DL01AB-6C5BB4",
+    "qr_active": true,
+    "created_at": "2026-11-03T14:11:50.948000",
+    "updated_at": "2026-11-03T14:11:50.948000",
+    "_id": "6ae9eba6cb1f236bdc2e5cba"
+  }
+]
