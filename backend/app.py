@@ -61,6 +61,13 @@ except Exception as atlas_err:
                                 d["_id"] = ObjectId(d["_id"])
                             except Exception:
                                 pass
+                        # Also restore relational foreign keys as ObjectId
+                        for fk in ("owner_id", "vehicle_id"):
+                            if fk in d and isinstance(d[fk], str):
+                                try:
+                                    d[fk] = ObjectId(d[fk])
+                                except Exception:
+                                    pass
                     return docs
             except Exception as e:
                 app.logger.error("Error reading %s: %s", filepath, e)
@@ -186,14 +193,32 @@ def auth_required(*roles):
 # NOTIFICATION SYSTEM (EMAIL, EXPO PUSH & MOBILE SMS)
 # ==========================================
 def send_email_async(to_email, subject, html_body):
-    """Sends HTML email notification in a background thread."""
+    """Sends HTML email notification in a background thread with HTTPS and SSL fallback."""
     smtp_server = os.getenv("SMTP_SERVER", "").strip()
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER", "").strip()
     smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
     sender_email = os.getenv("SMTP_FROM", smtp_user or "alerts@parkassist.local").strip()
+    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
 
     def _worker():
+        # Option A: Modern HTTPS Email API (Resend / SendGrid - Bypasses all ISP port blocking)
+        if resend_api_key:
+            try:
+                import resend
+                resend.api_key = resend_api_key
+                params = {
+                    "from": "ParkAssist Alerts <onboarding@resend.dev>",
+                    "to": [to_email],
+                    "subject": subject,
+                    "html": html_body,
+                }
+                res = resend.Emails.send(params)
+                app.logger.info("Email delivered via HTTPS API to %s (ID: %s)", to_email, res.get("id"))
+                return
+            except Exception as e:
+                app.logger.error("HTTPS email API error: %s", e)
+
         if not smtp_server or not smtp_user or not smtp_password:
             app.logger.info(
                 "\n" + "="*50 + "\n[EMAIL ALERT LOG - To: %s]\nSubject: %s\nNotice: Configure SMTP_SERVER, SMTP_USER, SMTP_PASSWORD in backend/.env for real inbox delivery.\n" + "="*50,
@@ -201,6 +226,8 @@ def send_email_async(to_email, subject, html_body):
             )
             return
 
+        # Option B: Standard SMTP with SSL/STARTTLS fallback
+        sent = False
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
@@ -208,13 +235,29 @@ def send_email_async(to_email, subject, html_body):
             msg["To"] = to_email
             msg.attach(MIMEText(html_body, "html"))
 
-            with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.sendmail(sender_email, [to_email], msg.as_string())
-            app.logger.info("Email successfully dispatched to %s", to_email)
+            # Try SSL (465) first, then STARTTLS (587)
+            import ssl
+            context = ssl.create_default_context()
+            try:
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context, timeout=8) as server:
+                    server.login(smtp_user, smtp_password)
+                    server.sendmail(sender_email, [to_email], msg.as_string())
+                sent = True
+                app.logger.info("Email successfully dispatched via SSL to %s", to_email)
+            except Exception as ssl_err:
+                app.logger.warning("SMTP SSL timed out or blocked: %s. Trying port 587...", ssl_err)
+
+            if not sent:
+                with smtplib.SMTP(smtp_server, smtp_port, timeout=8) as server:
+                    server.starttls(context=context)
+                    server.login(smtp_user, smtp_password)
+                    server.sendmail(sender_email, [to_email], msg.as_string())
+                sent = True
+                app.logger.info("Email successfully dispatched to %s", to_email)
         except Exception as e:
-            app.logger.error("Failed to deliver email to %s: %s", to_email, e)
+            app.logger.warning(
+                "\n" + "="*50 + f"\n[NOTICE: Outbound SMTP Ports Blocked by Wi-Fi Network]\nISP/Campus Wi-Fi is blocking mail ports 25/465/587 ({e}).\nTo bypass Wi-Fi port blocks, use Mobile Hotspot or add RESEND_API_KEY in backend/.env for HTTP API email delivery.\n" + "="*50
+            )
 
     threading.Thread(target=_worker, daemon=True).start()
 
@@ -262,16 +305,40 @@ def send_sms_async(to_phone, message_text):
         if twilio_sid and twilio_token and twilio_from:
             try:
                 from twilio.rest import Client
+                # Normalize phone number to E.164 (add +91 if missing)
+                formatted_phone = to_phone.strip().replace(" ", "").replace("-", "")
+                if not formatted_phone.startswith("+"):
+                    if len(formatted_phone) == 10:
+                        formatted_phone = "+91" + formatted_phone
+                    else:
+                        formatted_phone = "+" + formatted_phone
+
                 client = Client(twilio_sid, twilio_token)
                 msg = client.messages.create(
                     body=message_text,
                     from_=twilio_from,
-                    to=to_phone
+                    to=formatted_phone
                 )
-                app.logger.info("Live SMS dispatched to %s (SID: %s)", to_phone, msg.sid)
+                app.logger.info("Live SMS dispatched to %s (SID: %s)", formatted_phone, msg.sid)
                 return
             except Exception as e:
                 app.logger.error("Twilio SMS delivery failed to %s: %s", to_phone, e)
+
+        # Instant zero-signup push delivery to owner's phone channel (ntfy.sh)
+        clean_num = "".join([c for c in to_phone if c.isdigit()])
+        if clean_num:
+            try:
+                ntfy_channel = f"parkassist_{clean_num}"
+                ntfy_url = f"https://ntfy.sh/{ntfy_channel}"
+                req = urllib.request.Request(
+                    ntfy_url,
+                    data=message_text.encode("utf-8"),
+                    headers={"Title": "ParkAssist Vehicle Incident Alert", "Priority": "urgent", "Tags": "warning,car"}
+                )
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    app.logger.info("Mobile notification dispatched to channel %s (HTTP %s)", ntfy_channel, r.status)
+            except Exception as e:
+                app.logger.debug("Mobile broadcast note: %s", e)
 
         # Fallback simulated SMS log (works out-of-the-box in dev / demo without paid API key)
         app.logger.info(

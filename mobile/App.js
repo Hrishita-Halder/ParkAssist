@@ -53,6 +53,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [token, setToken] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
+  const [lastKnownIncidentId, setLastKnownIncidentId] = useState(null);
 
   // Auth Form Fields
   const [authName, setAuthName] = useState('');
@@ -264,7 +265,7 @@ export default function App() {
   useEffect(() => {
     if (!isLoggedIn || !token) return;
 
-    // Check for new incident reports every 5 seconds
+    // Check for new incident reports every 4 seconds
     const interval = setInterval(async () => {
       try {
         const cleanBase = apiUrl.replace(/\/+$/, '');
@@ -272,23 +273,24 @@ export default function App() {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
-        if (data && data.incidents) {
-          setReports((prev) => {
-            if (prev.length > 0 && data.incidents.length > prev.length) {
-              const newest = data.incidents[0];
+        if (data && data.incidents && data.incidents.length > 0) {
+          const newest = data.incidents[0];
+          setLastKnownIncidentId((prevId) => {
+            if (prevId && newest.id !== prevId) {
               Alert.alert(
                 '🚨 New Incident Reported!',
-                `${newest.type} reported for ${newest.reg_number || 'your vehicle'}:\n\n"${newest.description}"\n\nLocation: ${newest.location || 'Nearby'}`
+                `${newest.type} reported for ${newest.reg_number || 'your vehicle'}:\n\n"${newest.description}"\n\n📍 Location: ${newest.location || 'Nearby'}`
               );
               fetchDashboard();
             }
-            return data.incidents;
+            return newest.id;
           });
+          setReports(data.incidents);
         }
       } catch (e) {
         // Silent background check
       }
-    }, 5000);
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [isLoggedIn, token, apiUrl]);
