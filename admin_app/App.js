@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.20.10.2:5000/api';
+const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.57.106.169:5000/api';
 
 const colors = {
   navy: '#0f172a',
