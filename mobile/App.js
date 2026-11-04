@@ -19,7 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import QRCode from 'react-native-qrcode-svg';
 
 // Default backend API URL. Uses EXPO_PUBLIC_API_URL or defaults to your current LAN IP
-const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.2.5.125:5000/api';
+const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.20.10.2:5000/api';
 
 const colors = {
   navy: '#0f172a',
