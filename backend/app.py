@@ -26,16 +26,16 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ChangeMe123!")
 
 # MongoDB Connection with persistent local fallback if outbound port 27017 is blocked
 mongo_uri = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
-db_name = os.getenv("MONGO_DB", "parkassist")
+db_name = os.getenv("MONGO_DB", "Park_Assist")
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 try:
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=2000)
+    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
     # Probe connection
     client.admin.command("ping")
     db = client[db_name]
-    app.logger.info("Connected to remote MongoDB Atlas cluster")
+    app.logger.info("Connected to remote MongoDB Atlas cluster: %s", db_name)
 except Exception as atlas_err:
     app.logger.warning(
         "Remote MongoDB Atlas connection blocked by network/firewall: %s. Using persistent local disk database in backend/data/ so owner and admin apps share all users and vehicles.",
@@ -202,7 +202,32 @@ def send_email_async(to_email, subject, html_body):
     resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
 
     def _worker():
-        # Option A: Modern HTTPS Email API (Resend / SendGrid - Bypasses all ISP port blocking)
+        # Option A: Modern HTTPS Email API (Resend / Brevo - Bypasses all ISP port blocking)
+        brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+        if brevo_key:
+            try:
+                brevo_url = "https://api.brevo.com/v3/smtp/email"
+                b_payload = {
+                    "sender": {"name": "ParkAssist Vehicle Safety", "email": sender_email or "alerts@parkassist.local"},
+                    "to": [{"email": to_email}],
+                    "subject": subject,
+                    "htmlContent": html_body
+                }
+                b_req = urllib.request.Request(
+                    brevo_url,
+                    data=json.dumps(b_payload).encode("utf-8"),
+                    headers={
+                        "api-key": brevo_key,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    }
+                )
+                with urllib.request.urlopen(b_req, timeout=10) as b_res:
+                    app.logger.info("Email delivered via Brevo HTTPS API to %s (HTTP %s)", to_email, b_res.status)
+                    return
+            except Exception as b_err:
+                app.logger.error("Brevo HTTPS email delivery error: %s", b_err)
+
         if resend_api_key:
             try:
                 import resend
