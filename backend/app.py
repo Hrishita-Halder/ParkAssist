@@ -9,6 +9,14 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
+# Configure resilient public DNS resolver so MongoDB Atlas SRV records always resolve
+try:
+    import dns.resolver
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+    dns.resolver.default_resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+except Exception:
+    pass
+
 import jwt
 from bson import ObjectId
 from dotenv import load_dotenv
