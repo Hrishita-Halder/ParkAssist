@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "ParkAssist Admin",
+    "slug": "parkassist-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "android": {
+      "package": "com.parkassist.admin"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
+  }
+}
+

@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ParkAssist | Report Vehicle Incident</title>
+  <!-- Tailwind CSS CDN for modern mobile-friendly UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- HTML5 QR Code Scanner Library (No native build, works directly in mobile browser) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#0f172a',
+            primary: '#2563eb',
+            secondary: '#3b82f6',
+            surface: '#f8fafc'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Styling adjustments for html5-qrcode video element */
+    #qr-reader {
+      border: none !important;
+      width: 100% !important;
+    }
+    #qr-reader__scan_region video {
+      border-radius: 1rem !important;
+      object-fit: cover !important;
+    }
+    #qr-reader__dashboard {
+      padding: 10px 0 !important;
+    }
+    #qr-reader__dashboard button {
+      background-color: #2563eb !important;
+      color: white !important;
+      border-radius: 0.5rem !important;
+      padding: 0.5rem 1rem !important;
+      font-weight: 600 !important;
+      border: none !important;
+      margin: 4px !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 antialiased font-sans flex flex-col justify-between">
+
+  <!-- Header -->
+  <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-md mx-auto px-5 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-xl shadow-md">
+          🚗
+        </div>
+        <div>
+          <h1 class="text-xl font-extrabold tracking-tight">ParkAssist</h1>
+          <p class="text-xs text-blue-300 font-medium">Bystander Incident Reporter</p>
+        </div>
+      </div>
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        🛡️ Anonymous
+      </span>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-md w-full mx-auto px-4 py-6 flex-1 space-y-5">
+
+    <!-- Privacy Banner -->
+    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm flex items-start space-x-3">
+      <span class="text-2xl">🔒</span>
+      <div>
+        <h3 class="text-sm font-bold text-blue-950">Privacy First Communication</h3>
+        <p class="text-xs text-blue-800 mt-0.5 leading-relaxed">
+          Scan the QR code on the vehicle's windshield or enter the token. The owner's phone number and private contact info are never exposed.
+        </p>
+      </div>
+    </div>
+
+    <!-- Scanner / Input Toggle Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <!-- Tabs -->
+      <div class="flex border-b border-slate-200 bg-slate-50">
+        <button id="tabScannerBtn" onclick="switchTab('scanner')" class="flex-1 py-3 px-4 text-center font-bold text-sm text-blue-600 border-b-2 border-blue-600 bg-white transition-all flex items-center justify-center space-x-2">
+          <span>📷</span> <span>Camera Scanner</span>
+        </button>
+        <button id="tabManualBtn" onclick="switchTab('manual')" class="flex-1 py-3 px-4 text-center font-bold text-sm text-slate-500 hover:text-slate-800 transition-all flex items-center justify-center space-x-2">
+          <span>⌨️</span> <span>Enter Token</span>
+        </button>
+      </div>
+
+      <!-- Tab 1: Live QR Scanner -->
+      <div id="scannerSection" class="p-5">
+        <div class="text-center mb-3">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Point Camera at Windshield QR Code</p>
+        </div>
+
+        <div id="qr-reader" class="rounded-2xl overflow-hidden bg-slate-900 shadow-inner flex items-center justify-center min-h-[250px] relative">
+          <!-- Spinner placeholder while camera initializes -->
+          <div id="cameraLoadingPlaceholder" class="text-center p-6 text-slate-400">
+            <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <p class="text-xs font-medium">Requesting camera permissions...</p>
+          </div>
+        </div>
+
+        <div class="mt-4 flex justify-between items-center text-xs text-slate-500">
+          <button onclick="restartScanner()" class="text-blue-600 font-semibold hover:underline flex items-center space-x-1">
+            <span>🔄 Restart Camera</span>
+          </button>
+          <span>Auto-detects QR codes</span>
+        </div>
+      </div>
+
+      <!-- Tab 2: Manual Token Input -->
+      <div id="manualSection" class="p-5 hidden space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Vehicle QR Token ID</label>
+          <div class="relative">
+            <input type="text" id="manualTokenInput" placeholder="e.g. PA-KA05MH-91C288" class="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm font-semibold tracking-wide uppercase focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition" />
+            <button onclick="lookupManualToken()" class="absolute right-2 top-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg transition shadow-sm">
+              Verify
+            </button>
+          </div>
+          <p class="text-xs text-slate-400 mt-1.5">Printed at the bottom of the ParkAssist sticker on the windshield.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detected Vehicle Card (Shown after Scan or Lookup) -->
+    <div id="vehicleCard" class="hidden bg-white rounded-2xl shadow-md border-2 border-emerald-500/50 p-5 space-y-4 transition-all">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 mb-1">
+            ✓ Vehicle Identified
+          </span>
+          <h2 id="vehTitle" class="text-xl font-black text-slate-900 tracking-tight">Hyundai Creta</h2>
+          <p id="vehPlate" class="text-sm font-extrabold text-blue-600 font-mono tracking-wider mt-0.5">•••• •••• 5021</p>
+        </div>
+        <div class="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-2xl">
+          🚗
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+        <div>
+          <span class="text-slate-400 font-medium">Color:</span>
+          <p id="vehColor" class="font-bold text-slate-800">White</p>
+        </div>
+        <div>
+          <span class="text-slate-400 font-medium">Type:</span>
+          <p id="vehType" class="font-bold text-slate-800">SUV</p>
+        </div>
+        <div class="col-span-2 pt-1 border-t border-slate-200/40 flex items-center space-x-1">
+          <span class="text-slate-400 font-medium">Token:</span>
+          <span id="vehToken" class="font-mono font-bold text-blue-700 truncate">PA-KA05MH-91C288</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incident Report Form (Shown after vehicle is verified) -->
+    <div id="reportFormSection" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-5">
+      <div>
+        <h3 class="text-lg font-extrabold text-slate-900">Submit Incident Alert</h3>
+        <p class="text-xs text-slate-500">Send an instant alert to the vehicle driver.</p>
+      </div>
+
+      <!-- Quick Incident Type Chips -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Select Issue Type *</label>
+        <div class="grid grid-cols-2 gap-2.5" id="incidentTypeContainer">
+          <button type="button" onclick="selectType('Parking obstruction', this)" class="type-btn active bg-blue-50 border-2 border-blue-600 text-blue-900 font-bold py-2.5 px-3 rounded-xl text-xs text-left transition flex items-center space-x-2">
+            <span>⛔</span> <span class="truncate">Parking Obstruction</span>
+          </button>
+          <button type="button" onclick="selectType('Unsafe parking', this)" class="type-btn bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs text-left transition flex items-center space-x-2">
+            <span>⚠️</span> <span class="truncate">Unsafe Parking</span>
+          </button>
+          <button type="button" onclick="selectType('Lights left on', this)" class="type-btn bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs text-left transition flex items-center space-x-2">
+            <span>💡</span> <span class="truncate">Lights Left On</span>
+          </button>
+          <button type="button" onclick="selectType('Window rolled down', this)" class="type-btn bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs text-left transition flex items-center space-x-2">
+            <span>🪟</span> <span class="truncate">Window Open</span>
+          </button>
+          <button type="button" onclick="selectType('Vehicle damage', this)" class="type-btn bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs text-left transition flex items-center space-x-2">
+            <span>💥</span> <span class="truncate">Vehicle Damage</span>
+          </button>
+          <button type="button" onclick="selectType('Other emergency', this)" class="type-btn bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs text-left transition flex items-center space-x-2">
+            <span>📢</span> <span class="truncate">Other Emergency</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Description Textarea -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description *</label>
+        <textarea id="reportDescription" rows="3" placeholder="Please describe what is happening (e.g., blocking basement exit gate, right headlight is on...)" class="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"></textarea>
+      </div>
+
+      <!-- Option 1: Attach Photo / Image -->
+      <div>
+        <div class="flex justify-between items-center mb-1.5">
+          <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">Attach Photo of Incident (Optional)</label>
+          <span class="text-[11px] text-slate-400">Max 5MB</span>
+        </div>
+        
+        <input type="file" id="imageFileInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageSelection(event)">
+        
+        <div id="imageUploadBox" onclick="document.getElementById('imageFileInput').click()" class="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-xl p-4 text-center cursor-pointer transition">
+          <div class="text-2xl mb-1">📸</div>
+          <p class="text-xs font-bold text-slate-700">Tap to Take Photo or Upload</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">Show how the car is parked or the issue</p>
+        </div>
+
+        <!-- Image Preview Box -->
+        <div id="imagePreviewBox" class="hidden relative mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-900 max-h-48 flex items-center justify-center">
+          <img id="imagePreview" src="" alt="Incident Preview" class="max-h-48 w-full object-contain">
+          <button type="button" onclick="removeSelectedImage(event)" class="absolute top-2 right-2 bg-red-600/90 text-white p-1.5 rounded-full text-xs hover:bg-red-700 shadow-md">
+            ✕ Remove
+          </button>
+        </div>
+      </div>
+
+      <!-- Option 2: GPS Coordinates -->
+      <div>
+        <div class="flex justify-between items-center mb-1.5">
+          <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">GPS Coordinates (Optional)</label>
+          <span id="gpsStatusBadge" class="text-[11px] text-slate-400">Not captured</span>
+        </div>
+
+        <button type="button" id="getGpsBtn" onclick="captureGpsLocation()" class="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center space-x-2 transition shadow-sm">
+          <span>📍</span> <span id="gpsBtnLabel">Attach Current GPS Location</span>
+        </button>
+
+        <div id="gpsDetailsBox" class="hidden mt-2 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
+          <div class="flex items-center space-x-2">
+            <span>✅</span>
+            <div>
+              <p class="font-bold" id="gpsCoordsText">Lat: 0.000, Lon: 0.000</p>
+              <p class="text-[10px] text-emerald-600" id="gpsAccuracyText">Accurate to ~10m</p>
+            </div>
+          </div>
+          <button type="button" onclick="clearGpsLocation()" class="text-xs text-red-600 font-bold hover:underline">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <!-- Location Input -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Location / Parking Slot Note (Optional)</label>
+        <input type="text" id="reportLocation" placeholder="e.g. Basement B2, near Pillar 14" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition" />
+      </div>
+
+      <!-- Submit Button -->
+      <button id="submitBtn" onclick="submitReport()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-base py-3.5 rounded-xl shadow-lg shadow-blue-500/30 transition transform active:scale-[0.98] flex items-center justify-center space-x-2">
+        <span>🚀</span> <span>Notify Vehicle Owner Now</span>
+      </button>
+    </div>
+
+    <!-- Success Modal / Toast -->
+    <div id="successCard" class="hidden bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-6 text-center space-y-3 shadow-lg">
+      <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 text-3xl flex items-center justify-center mx-auto shadow-sm">
+        ✓
+      </div>
+      <h3 class="text-xl font-extrabold text-emerald-950">Owner Alerted Successfully!</h3>
+      <p id="successMessage" class="text-xs text-emerald-800 leading-relaxed">
+        The vehicle owner has been dispatched an urgent notification regarding the incident.
+      </p>
+      <div class="pt-3">
+        <button onclick="resetReporter()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow">
+          Report Another Issue
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400 mt-8">
+    <p>ParkAssist Privacy Framework • Group 14</p>
+    <p class="text-[10px] mt-0.5">Secure, anonymous QR-based community parking resolution</p>
+  </footer>
+
+  <script>
+    let activeToken = '';
+    let selectedIncidentType = 'Parking obstruction';
+    let html5QrCode = null;
+    let base64Image = null;
+    let capturedCoordinates = null;
+
+    // Handle Image upload and compression
+    function handleImageSelection(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        // Create an image object to compress if necessary
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const maxDim = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          base64Image = canvas.toDataURL('image/jpeg', 0.8);
+          document.getElementById('imagePreview').src = base64Image;
+          document.getElementById('imageUploadBox').classList.add('hidden');
+          document.getElementById('imagePreviewBox').classList.remove('hidden');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeSelectedImage(e) {
+      if (e) e.stopPropagation();
+      base64Image = null;
+      document.getElementById('imageFileInput').value = '';
+      document.getElementById('imagePreview').src = '';
+      document.getElementById('imagePreviewBox').classList.add('hidden');
+      document.getElementById('imageUploadBox').classList.remove('hidden');
+    }
+
+    // Capture GPS coordinates using HTML5 Geolocation API
+    function captureGpsLocation() {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+      }
+
+      const btn = document.getElementById('getGpsBtn');
+      const label = document.getElementById('gpsBtnLabel');
+      label.innerText = 'Acquiring GPS location...';
+      btn.disabled = true;
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          capturedCoordinates = {
+            latitude: Number(pos.coords.latitude.toFixed(6)),
+            longitude: Number(pos.coords.longitude.toFixed(6)),
+            accuracy: Math.round(pos.coords.accuracy)
+          };
+
+          document.getElementById('gpsCoordsText').innerText =
+            `Lat: ${capturedCoordinates.latitude}, Lon: ${capturedCoordinates.longitude}`;
+          document.getElementById('gpsAccuracyText').innerText =
+            `Accurate within ~${capturedCoordinates.accuracy} meters`;
+          document.getElementById('gpsStatusBadge').innerText = 'Attached ✓';
+          document.getElementById('gpsStatusBadge').className = 'text-[11px] text-emerald-600 font-bold';
+
+          document.getElementById('gpsDetailsBox').classList.remove('hidden');
+          btn.classList.add('hidden');
+          btn.disabled = false;
+        },
+        (err) => {
+          btn.disabled = false;
+          label.innerText = 'Attach Current GPS Location';
+          let msg = "Could not fetch location.";
+          if (err.code === 1) msg = "Location permission denied. Please allow location access in your browser settings.";
+          else if (err.code === 2) msg = "Position unavailable.";
+          else if (err.code === 3) msg = "Location request timed out.";
+          alert(msg);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function clearGpsLocation() {
+      capturedCoordinates = null;
+      document.getElementById('gpsDetailsBox').classList.add('hidden');
+      const btn = document.getElementById('getGpsBtn');
+      btn.classList.remove('hidden');
+      document.getElementById('gpsBtnLabel').innerText = 'Attach Current GPS Location';
+      document.getElementById('gpsStatusBadge').innerText = 'Not captured';
+      document.getElementById('gpsStatusBadge').className = 'text-[11px] text-slate-400';
+    }
+
+    // Check if URL has ?token=... or /report/<token>
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. Check path like /report/PA-KA05MH-91C288
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      let pathToken = '';
+      if (pathParts.length >= 2 && pathParts[0] === 'report') {
+        pathToken = decodeURIComponent(pathParts[1]);
+      }
+
+      // 2. Check query string like ?token=PA-KA05MH-91C288
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryToken = urlParams.get('token');
+
+      // 3. Check server-injected token
+      const serverToken = "{{ token }}";
+
+      const finalToken = pathToken || queryToken || serverToken;
+
+      if (finalToken && finalToken.trim() && finalToken !== 'None') {
+        // Vehicle already identified directly from QR scan link!
+        // Hide scanner and jump immediately to the incident reporting form
+        const toggleCard = document.querySelector('.overflow-hidden.border.border-slate-200');
+        if (toggleCard) toggleCard.style.display = 'none';
+        verifyAndDisplayVehicle(finalToken.trim());
+      } else {
+        // Bystander opened plain reporter homepage -> start in-browser camera scanner
+        initScanner();
+      }
+    });
+
+    function switchTab(tab) {
+      const scannerSec = document.getElementById('scannerSection');
+      const manualSec = document.getElementById('manualSection');
+      const tabScannerBtn = document.getElementById('tabScannerBtn');
+      const tabManualBtn = document.getElementById('tabManualBtn');
+
+      if (tab === 'scanner') {
+        scannerSec.classList.remove('hidden');
+        manualSec.classList.add('hidden');
+        tabScannerBtn.className = "flex-1 py-3 px-4 text-center font-bold text-sm text-blue-600 border-b-2 border-blue-600 bg-white transition-all flex items-center justify-center space-x-2";
+        tabManualBtn.className = "flex-1 py-3 px-4 text-center font-bold text-sm text-slate-500 hover:text-slate-800 transition-all flex items-center justify-center space-x-2";
+        restartScanner();
+      } else {
+        scannerSec.classList.add('hidden');
+        manualSec.classList.remove('hidden');
+        tabManualBtn.className = "flex-1 py-3 px-4 text-center font-bold text-sm text-blue-600 border-b-2 border-blue-600 bg-white transition-all flex items-center justify-center space-x-2";
+        tabScannerBtn.className = "flex-1 py-3 px-4 text-center font-bold text-sm text-slate-500 hover:text-slate-800 transition-all flex items-center justify-center space-x-2";
+        stopScanner();
+      }
+    }
+
+    function initScanner() {
+      const qrRegionId = "qr-reader";
+      html5QrCode = new Html5Qrcode(qrRegionId);
+
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      };
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanFailure
+      ).then(() => {
+        const ph = document.getElementById('cameraLoadingPlaceholder');
+        if (ph) ph.style.display = 'none';
+      }).catch(err => {
+        console.warn("Camera start error:", err);
+        const ph = document.getElementById('cameraLoadingPlaceholder');
+        if (ph) {
+          ph.innerHTML = `
+            <div class="text-amber-400 text-2xl mb-1">📷</div>
+            <p class="text-xs text-slate-300">Camera permission needed or not available.</p>
+            <p class="text-[11px] text-slate-400 mt-1">Please use the "Enter Token" tab above.</p>
+          `;
+        }
+      });
+    }
+
+    function onScanSuccess(decodedText) {
+      console.log("Scanned text:", decodedText);
+      // If QR code contains full URL like http://.../report/PA-1234 or plain token PA-1234
+      let token = decodedText.trim();
+      if (token.includes('/report/')) {
+        token = token.split('/report/').pop();
+      } else if (token.includes('token=')) {
+        token = new URL(token).searchParams.get('token') || token;
+      }
+
+      // Stop scanner upon successful read
+      stopScanner();
+      verifyAndDisplayVehicle(token);
+    }
+
+    function onScanFailure(error) {
+      // Quiet background scanning log
+    }
+
+    function stopScanner() {
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(e => console.log(e));
+      }
+    }
+
+    function restartScanner() {
+      stopScanner();
+      setTimeout(initScanner, 300);
+    }
+
+    function lookupManualToken() {
+      const val = document.getElementById('manualTokenInput').value.trim();
+      if (!val) {
+        alert("Please enter a vehicle QR token ID.");
+        return;
+      }
+      verifyAndDisplayVehicle(val);
+    }
+
+    async function verifyAndDisplayVehicle(token) {
+      try {
+        const res = await fetch(`/api/vehicles/public/${encodeURIComponent(token)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || "Vehicle QR token not recognized or inactive.");
+          return;
+        }
+
+        activeToken = token;
+        const v = data.vehicle;
+
+        document.getElementById('vehTitle').innerText = `${v.make || 'Registered'} ${v.model || 'Vehicle'}`;
+        document.getElementById('vehPlate').innerText = v.masked_registration || '•••• •••• ••••';
+        document.getElementById('vehColor').innerText = v.color || 'Standard';
+        document.getElementById('vehType').innerText = v.type || 'Vehicle';
+        document.getElementById('vehToken').innerText = v.token || token;
+
+        // Show Vehicle & Form cards
+        document.getElementById('vehicleCard').classList.remove('hidden');
+        document.getElementById('reportFormSection').classList.remove('hidden');
+        document.getElementById('successCard').classList.add('hidden');
+
+        // Scroll to form smoothly
+        document.getElementById('vehicleCard').scrollIntoView({ behavior: 'smooth' });
+      } catch (err) {
+        alert("Could not reach backend: " + err.message);
+      }
+    }
+
+    function selectType(type, btn) {
+      selectedIncidentType = type;
+      document.querySelectorAll('.type-btn').forEach(b => {
+        b.className = "type-btn bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs text-left transition flex items-center space-x-2";
+      });
+      btn.className = "type-btn active bg-blue-50 border-2 border-blue-600 text-blue-900 font-bold py-2.5 px-3 rounded-xl text-xs text-left transition flex items-center space-x-2";
+    }
+
+    async function submitReport() {
+      const desc = document.getElementById('reportDescription').value.trim();
+      const loc = document.getElementById('reportLocation').value.trim();
+      const submitBtn = document.getElementById('submitBtn');
+
+      if (!activeToken) {
+        alert("Please scan or enter a valid vehicle QR token first.");
+        return;
+      }
+
+      if (!desc) {
+        alert("Please provide a short description of the issue.");
+        document.getElementById('reportDescription').focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span>⏳</span> <span>Alerting Owner...</span>`;
+
+      try {
+        const payload = {
+          vehicle_token: activeToken,
+          type: selectedIncidentType,
+          description: desc,
+          location: loc || 'Nearby'
+        };
+
+        if (base64Image) {
+          payload.image = base64Image;
+        }
+
+        if (capturedCoordinates) {
+          payload.coordinates = capturedCoordinates;
+        }
+
+        const res = await fetch('/api/incidents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || "Failed to submit incident report.");
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `<span>🚀</span> <span>Notify Vehicle Owner Now</span>`;
+          return;
+        }
+
+        // Hide form and show success
+        document.getElementById('reportFormSection').classList.add('hidden');
+        document.getElementById('vehicleCard').classList.add('hidden');
+        const successCard = document.getElementById('successCard');
+        successCard.classList.remove('hidden');
+
+        let msg = `Incident report #${data.incident.id} has been recorded and the vehicle owner has been alerted.`;
+        if (data.possible_duplicate) {
+          msg += ` (Note: A similar report was recently submitted for this vehicle).`;
+        }
+        document.getElementById('successMessage').innerText = msg;
+        successCard.scrollIntoView({ behavior: 'smooth' });
+
+      } catch (err) {
+        alert("Submission failed: " + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span>🚀</span> <span>Notify Vehicle Owner Now</span>`;
+      }
+    }
+
+    function resetReporter() {
+      document.getElementById('reportDescription').value = '';
+      document.getElementById('reportLocation').value = '';
+      document.getElementById('manualTokenInput').value = '';
+      removeSelectedImage();
+      clearGpsLocation();
+      document.getElementById('successCard').classList.add('hidden');
+      document.getElementById('vehicleCard').classList.add('hidden');
+      document.getElementById('reportFormSection').classList.add('hidden');
+      activeToken = '';
+      switchTab('scanner');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+</body>
+</html>
+

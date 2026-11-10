@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "ParkAssist",
+    "slug": "parkassist",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#f5f7fb"
+    },
+    "android": {
+      "package": "com.group14.parkassist"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
+  }
+}
